@@ -19,9 +19,9 @@ func (m *Model) getResult() Result {
 		idx      []int
 	)
 	for i := range m.opts {
-		if m.innerOpts[i].IsSelected {
-			if !m.innerOpts[i].QuitType.IsEmpty() {
-				quitType = m.innerOpts[i].QuitType
+		if m.allVariants[i].IsSelected {
+			if !m.allVariants[i].QuitType.IsEmpty() {
+				quitType = m.allVariants[i].QuitType
 				continue
 			}
 

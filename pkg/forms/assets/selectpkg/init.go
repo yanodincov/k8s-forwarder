@@ -3,8 +3,6 @@ package selectpkg
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/yanodincov/k8s-forwarder/pkg/helper"
-	"golang.org/x/term"
-	"os"
 	"slices"
 	"time"
 )
@@ -12,6 +10,8 @@ import (
 type TickMsg struct{}
 
 func (m *Model) Init() tea.Cmd {
+	tea.ClearScreen()
+
 	m.tickCmdFn = helper.If(m.reloadInterval > 0,
 		func() tea.Cmd { return tea.Tick(m.reloadInterval, func(time.Time) tea.Msg { return TickMsg{} }) },
 		func() tea.Cmd { return nil },
@@ -23,26 +23,17 @@ func (m *Model) Init() tea.Cmd {
 		m.questionFn = func() string { return "" }
 	}
 
-	m.innerOpts = append(
-		helper.SliceMap(m.opts, func(opts Option) *innerOption {
-			return &innerOption{
-				Text: opts.Text,
-				Desc: opts.Desc,
-			}
+	m.allVariants = append(
+		helper.SliceMap(m.opts, func(opts Option) *variant {
+			return &variant{Option: opts}
 		}),
-		&innerOption{Text: m.submitChoiceName, QuitType: QuitTypeSubmit},
-		&innerOption{Text: m.quitChoiceName, QuitType: QuitTypeBack},
+		&variant{Option: Option{Text: m.submitChoiceName}, QuitType: QuitTypeSubmit},
+		&variant{Option: Option{Text: m.quitChoiceName}, QuitType: QuitTypeBack},
 	)
+	m.allVariants[0].IsHovered = true
 
 	m.filter = []rune{}
-	m.innerOptsQueue = helper.NewCircularQueue(slices.Clone(m.innerOpts), 0)
-	m.innerOptsQueue.Current().IsHovered = true
-
-	m.windowWidth, m.windowHeight, _ = term.GetSize(int(os.Stdin.Fd()))
-
-	tea.ClearScreen()
-
-	m.initPaginator()
+	m.currentVariants = slices.Clone(m.allVariants)
 
 	return m.tickCmdFn()
 }

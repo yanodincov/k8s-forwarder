@@ -1,15 +1,12 @@
 package selectpkg
 
 import (
-	"github.com/charmbracelet/bubbles/paginator"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/yanodincov/k8s-forwarder/pkg/helper"
 	"time"
 )
 
-type innerOption struct {
-	Text string
-	Desc string
+type variant struct {
+	Option Option
 
 	IsSelected bool
 	IsHovered  bool
@@ -28,24 +25,19 @@ type Model struct {
 	quitChoiceName   string
 	submitChoiceName string
 	reloadInterval   time.Duration
-
-	// Static
-	tickCmdFn func() tea.Cmd
-	opts      []Option
+	tickCmdFn        func() tea.Cmd
+	opts             []Option
 
 	// Init
-	innerOpts      []*innerOption
-	filter         []rune
-	innerOptsQueue *helper.CircularQueueLimited[*innerOption]
-	paginator      paginator.Model
-	windowWidth    int
-	windowHeight   int
+	allVariants     []*variant
+	filter          []rune
+	currentVariants []*variant
 
 	// Result
 	quitType QuitType
 }
 
-func NewMultiSelectModel(opts []Option) *Model {
+func NewSelectModel(opts []Option) *Model {
 	return &Model{
 		headerFn:         func() string { return "" },
 		questionFn:       func() string { return "" },

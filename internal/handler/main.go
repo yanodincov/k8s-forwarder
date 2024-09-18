@@ -89,8 +89,9 @@ func (s *MainScreen) Show() {
 	}
 
 	cli.ClearScreen()
-	selectModel := selectpkg.
-		NewMultiSelectModel(opts)
+	selectModel := selectpkg.NewSelectModel(opts).
+		SetHeaderFn(func() string { return "K8s forwarder application" }).
+		SetQuestionFn(func() string { return "Choose an option" })
 
 	p := tea.NewProgram(selectModel)
 	model, err := p.Run()

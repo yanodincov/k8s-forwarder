@@ -1,113 +1,61 @@
 package selectpkg
 
 import (
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/list"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/yanodincov/k8s-forwarder/pkg/forms/assets/selectpkg/template"
 	"github.com/yanodincov/k8s-forwarder/pkg/helper"
-	"strings"
-	"unicode/utf8"
 )
 
 const (
-	minPaginatorPageSize = 3
-	firstQuitMarinTop    = 1
-
-	blockDelimiterSize = 2
-	blocksCount        = 4
-
-	defaultForeground  lipgloss.Color = "#bbbbbb"
-	quitForeground     lipgloss.Color = "#777777"
-	selectedForeground lipgloss.Color = "#ffffff"
-
-	cursorSymbol          = "→"
-	selectedListDelimiter = ", "
+	pageSize           = 3
+	defaultForeground  = "#bbbbbb"
+	selectedForeground = "#ffffff"
+	accentColor        = "#ff8700"
+	cursorSymbol       = "→"
+	pageSymbol         = " ▪"
 )
 
 func (m *Model) View() string {
-	var (
-		opts         []any
-		selectedOpts []string
-	)
-	for _, opt := range m.innerOptsQueue.Data() {
-		if opt.IsSelected {
-			selectedOpts = append(selectedOpts, opt.Text)
-		}
-		opts = append(opts, opt.Text)
+	tea.ClearScreen()
+
+	opt, i := helper.SliceFilterOne(m.currentVariants, func(opt *variant) bool {
+		return opt.IsHovered
+	})
+
+	totalPagesI := len(m.currentVariants)/pageSize + 1
+	currentPageI := i / pageSize
+
+	start := currentPageI * pageSize
+	end := min(start+pageSize, len(m.currentVariants))
+	variants := m.currentVariants[start:end]
+
+	view, err := template.RenderSelectTemplate(template.SelectTemplateData{
+		Header:   m.headerFn(),
+		Question: m.questionFn(),
+		Filter:   string(m.filter),
+		Footer:   opt.Option.Desc,
+
+		TotalPages:  totalPagesI,
+		CurrentPage: currentPageI,
+		PageSymbol:  pageSymbol,
+
+		HoverSymbol:   cursorSymbol,
+		AccentColor:   accentColor,
+		ActiveColor:   selectedForeground,
+		InactiveColor: defaultForeground,
+
+		Options: helper.SliceMap(variants, func(variant *variant) template.SelectTemplateOption {
+			return template.SelectTemplateOption{
+				Text:       variant.Option.Text,
+				IsSelected: variant.IsSelected,
+				IsHovered:  variant.IsHovered,
+				IsSpecial:  !variant.QuitType.IsEmpty(),
+			}
+		}),
+	})
+	if err != nil {
+		return err.Error()
 	}
 
-	header := m.headerFn()
-	question := m.questionFn()
-	if len(m.filter) > 0 {
-		question += " [" + string(m.filter) + "]"
-	}
-
-	if len(selectedOpts) > 0 {
-		selectedOptions := "Selected options: "
-		identLen := utf8.RuneCountInString(selectedOptions)
-
-		selectedOptions += lipgloss.NewStyle().
-			Foreground(selectedForeground).
-			Render(helper.GetTextFromItemsWithIdent(helper.MakeColumnTextWithIdentSpec{
-				Items:         selectedOpts,
-				Delimiter:     selectedListDelimiter,
-				MaxRowLen:     m.windowWidth,
-				IdentLen:      identLen,
-				FirstRowIdent: 0,
-			}))
-
-		question += "\n" + selectedOptions
-	}
-
-	contentRows := strings.Count(header, "\n") +
-		strings.Count(question, "\n") +
-		(blocksCount-1)*blockDelimiterSize
-	m.rebuildPaginator(helper.Max(m.windowHeight-contentRows, minPaginatorPageSize))
-	isSinglePageList := m.innerOptsQueue.Len() <= m.paginator.PerPage
-
-	var iIncrement int
-	if !isSinglePageList {
-		start, end := m.paginator.GetSliceBounds(m.innerOptsQueue.Len())
-		opts = opts[start:end]
-		iIncrement = start
-	}
-
-	optionList := list.
-		New(opts...).
-		ItemStyleFunc(func(listItem list.Items, i int) lipgloss.Style {
-			i += iIncrement
-
-			style := lipgloss.NewStyle().Foreground(defaultForeground)
-			opt := m.innerOptsQueue.Data()[i]
-
-			if opt.IsSelected {
-				style = style.Foreground(selectedForeground)
-			}
-			if opt.IsHovered {
-				style = style.Bold(true)
-			}
-			if !opt.QuitType.IsEmpty() {
-				style = style.Italic(true).Foreground(quitForeground)
-			} else if isSinglePageList && i < m.innerOptsQueue.Len()-1 && !m.innerOptsQueue.Data()[i+1].QuitType.IsEmpty() {
-				style = style.MarginBottom(firstQuitMarinTop)
-			}
-
-			return style
-		}).
-		Enumerator(func(l list.Items, i int) string {
-			i += iIncrement
-
-			if m.innerOptsQueue.Data()[i].IsHovered {
-				return cursorSymbol
-			}
-
-			return " "
-		})
-
-	parts := make([]string, blocksCount)
-	parts[0] = header
-	parts[1] = question
-	parts[2] = optionList.String()
-	parts[3] = helper.If(isSinglePageList, "", m.paginator.View())
-
-	return strings.Join(parts, strings.Repeat("\n", blockDelimiterSize))
+	return view
 }

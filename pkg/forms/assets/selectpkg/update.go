@@ -13,35 +13,39 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TickMsg:
 		return m, m.tickCmdFn()
 
-	case tea.WindowSizeMsg:
-		m.windowWidth = msg.Width
-		m.windowHeight = msg.Height
-
 	case tea.KeyMsg:
 		switch msg.Type {
 		case tea.KeyCtrlC:
-			// Select the quit innerOption
+			// Select the quit variant
 			m.quitType = QuitTypeInterrupt
 
 			return m, tea.Quit
 
 		case tea.KeyUp, tea.KeyDown:
-			m.innerOptsQueue.Current().IsHovered = false
-			helper.IfFn(msg.Type == tea.KeyDown, m.innerOptsQueue.Next, m.innerOptsQueue.Prev).IsHovered = true
+			opt, i := helper.SliceFilterOne(m.currentVariants, func(opt *variant) bool {
+				return opt.IsHovered
+			})
+			opt.IsHovered = false
+
+			i = helper.If(msg.Type == tea.KeyDown, i+1, i-1)
+			i = min(max(i, 0), len(m.currentVariants)-1)
+			m.currentVariants[i].IsHovered = true
 
 			return m, nil
 
 		case tea.KeyEnter:
-			cur := m.innerOptsQueue.Current()
+			opt, _ := helper.SliceFilterOne(m.currentVariants, func(opt *variant) bool {
+				return opt.IsHovered
+			})
 
-			// If the innerOption is selected, we should not allow to select special innerOpts
-			if !cur.QuitType.IsEmpty() {
-				m.quitType = cur.QuitType
+			// If the variant is selected, we should not allow to select special allVariants
+			if !opt.QuitType.IsEmpty() {
+				m.quitType = opt.QuitType
 
 				return m, tea.Quit
 			}
 
-			cur.IsSelected = !cur.IsSelected
+			opt.IsSelected = !opt.IsSelected
 
 			return m, nil
 
@@ -51,7 +55,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.updateVisibleOption(false)
 			}
 
-		case tea.KeyRunes:
+		case tea.KeyRunes, tea.KeySpace:
 			m.filter = append(m.filter, msg.Runes...)
 			m.updateVisibleOption(true)
 		}
@@ -62,32 +66,31 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) updateVisibleOption(add bool) {
-	var (
-		cur  int
-		opts []*innerOption
-	)
-
 	if len(m.filter) == 0 {
-		opts = slices.Clone(m.innerOpts)
-	} else {
-		filterStr := strings.ToLower(string(m.filter))
+		m.currentVariants = slices.Clone(m.allVariants)
+	}
 
-		for _, opt := range helper.If(add, m.innerOptsQueue.Data(), m.innerOpts) {
-			if !opt.QuitType.IsEmpty() {
-				opts = append(opts, opt)
-				continue
-			}
+	filterStr := strings.ToLower(string(m.filter))
 
-			if strings.Contains(strings.ToLower(opt.Text), filterStr) {
-				opts = append(opts, opt)
-				if opt.IsHovered {
-					cur = len(opts) - 1
-				}
-			}
+	var opts []*variant
+	hasHovered := true
+	for _, opt := range helper.If(add, m.currentVariants, m.allVariants) {
+
+		contains := strings.Contains(strings.ToLower(opt.Option.Text), filterStr)
+		if contains || !opt.QuitType.IsEmpty() {
+			opts = append(opts, opt)
+		}
+
+		// If the hovered option is not in the visible options, we should remove the hover
+		if opt.IsHovered && (!contains || !opt.QuitType.IsEmpty()) {
+			opt.IsHovered = false
+			hasHovered = false
 		}
 	}
 
-	m.innerOptsQueue.Current().IsHovered = false
-	m.innerOptsQueue = helper.NewCircularQueue(opts, cur)
-	m.innerOptsQueue.Current().IsHovered = true
+	if !hasHovered && len(opts) > 0 {
+		opts[0].IsHovered = true
+	}
+
+	m.currentVariants = opts
 }

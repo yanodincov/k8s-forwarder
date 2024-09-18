@@ -10,16 +10,20 @@ func SliceFilter[T any](s []T, f func(T) bool) []T {
 	return r
 }
 
-func SliceFilterOne[T any](s []T, f func(T) bool) T {
-	var r T
-	for _, v := range s {
+func SliceFilterOne[T any](s []T, f func(T) bool) (T, int) {
+	var (
+		res T
+		idx int
+	)
+	for i, v := range s {
 		if f(v) {
-			r = v
+			res = v
+			idx = i
 			break
 		}
 	}
 
-	return r
+	return res, idx
 }
 
 func SliceMap[T, U any](s []T, f func(T) U) []U {

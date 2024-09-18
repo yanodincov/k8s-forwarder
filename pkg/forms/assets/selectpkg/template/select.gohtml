@@ -1,0 +1,49 @@
+{{- /*
+
+.Header   [string] : the header of the select
+.Question [string] : the question of the select
+.Filter   [string] : the filter of the select
+.Footer   [string] : the footer of the select
+
+.Options  [array] : the options of the select
+.Options[].Text [string] : the text of the option
+.Options[].IsSelected [bool] : if the option is selected
+.Options[].IsHovered  [bool] : if the option is hovered
+.Options[].IsSpecial  [bool] : if the option is special
+
+.TotalPages [int] : the total pages of the select
+.CurrentPage [int] : the current page of the select
+.PageSymbol  [rune] : the symbol of the page
+
+.HoverSymbol [rune] : the symbol of the select
+.AccentColor   [string] : the accent color of the select
+.ActiveColor   [string] : the active color of the select
+.InactiveColor [string] : the inactive color of the select
+
+italic    [func(text string) string]                         : a function that returns the string in italic
+bold      [func(text string) string]                         : a function that returns the string in bold
+underline [func(text string) string]                         : a function that returns the string in underline
+color     [func(text string, color string) string]           : a function that returns the string in the color
+ternary   [func(condition bool, true any, false any) string] : a function that returns the true string if the condition
+                                                               is true, otherwise the false string
+rangeseq [func(n int) []int]                                 : a function that returns a sequence of numbers from 1 to n
+*/ -}}
+
+{{ .Header }}
+
+{{ .Question }}{{ if .Filter }} [ {{ italic (color .Filter .AccentColor) }} ]{{ end }}
+
+{{ range $key, $value := .Options }}
+    {{- $option := color $value.Text (ternary $value.IsSelected $.ActiveColor $.InactiveColor) -}}
+    {{- $option = ternary $value.IsHovered (bold $option) $option -}}
+    {{- $option = ternary $value.IsSpecial (italic $option) $option -}}
+    {{ ternary $value.IsHovered $.HoverSymbol " " }} {{ $option }}
+{{ end }}
+
+{{ if gt .TotalPages 1 -}}
+    {{- range $key, $value := rangeseq .TotalPages -}}
+        {{-  color $.PageSymbol (ternary (eq $.CurrentPage $value) $.ActiveColor $.InactiveColor) }}
+    {{- end -}}
+{{- end }}
+
+{{ .Footer }}
